@@ -1,10 +1,18 @@
 package main
 
-import ("log"; "net"; "os"; "bufio"; "fmt")
+import ("log"; "net"; "os"; "bufio"; "fmt"; "strings"; "time"; "strconv")
 //A client struct that contains connection information and channel info
 type Client struct {
     conn net.Conn
     ch chan<- string
+}
+
+type User struct {
+    Nick string
+    User string
+    Real string
+    IP string
+    Host string
 }
 
 
@@ -28,6 +36,7 @@ func main() {
                 log.Println(err)
                     continue
             }
+
         //This is really cool, its a goroutine which will exec concurrently w/ other goroutines in the same address space
         go connectionManagement(conn, msgChan, addChan, rmChan)
     }
@@ -55,8 +64,26 @@ func connectionManagement(c net.Conn, msgChan chan<- string, addChan chan<- Clie
             output, _, err := bufc.ReadLine()
             if err != nil {
                 break
+            } else {
+                splitStr := strings.Split(string(output), " ")
+                switch splitStr[0] {
+                    case "/QUIT":
+                        msgs <- "User " + nick + "has left the room. Reason:" + strings.Replace(splitStr[1], "\r\n", "", 1)
+                        c.Close()
+                    case "/PING":
+                        msgs <- "PONG " + strings.Replace(splitStr[1], "\r\n", "", 1)
+                    case "/PONG":
+                        msgs <- "PONG " + strings.Replace(splitStr[1], "\r\n", "", 1) 
+                    case "/NICK":
+                        nick = strings.Replace(splitStr[1], "\r\n", "", 1)
+                    case "/TIME":
+                        //Need to convert out of unix time
+                        msgs <- strconv.FormatInt(time.Now().Unix(), 10)
+                    default:
+                        msgs <- nick + ": " + string(output)
+                }
             }
-            msgs <- nick + ": " + string(output)
+
         }
 
         msgs <- "User " + nick + " has left the room"
